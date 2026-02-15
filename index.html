@@ -58,6 +58,7 @@ a{color:var(--accent);text-decoration:none}
 .story-card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:1.5rem;backdrop-filter:blur(10px);transition:all .3s;cursor:default;position:relative;overflow:hidden}
 .story-card:hover{border-color:rgba(0,255,136,.2);background:rgba(255,255,255,.05);transform:translateY(-2px)}
 .story-card.cleared{opacity:.4;pointer-events:none}
+.story-card.locked{opacity:.3;pointer-events:none;filter:blur(1px)}
 .story-card.cleared::after{content:'✓ 클리어';position:absolute;top:1rem;right:1rem;background:var(--accent2);color:#000;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700}
 .card-header{display:flex;align-items:center;gap:12px;margin-bottom:.8rem}
 .card-emoji{font-size:2rem}
@@ -162,6 +163,7 @@ a{color:var(--accent);text-decoration:none}
   <section class="stories-section" id="stories-section">
     <h2>📂 미스터리 목록</h2>
     <p class="subtitle">하나를 골라 진실을 밝혀라</p>
+    <p id="story-progress" style="color:var(--accent);font-size:.9rem;margin-bottom:1.5rem"></p>
     <div class="story-list" id="story-list"></div>
   </section>
 </div>
@@ -258,14 +260,42 @@ async function loadStories() {
   renderStories();
 }
 
+function getUnlockedCount() {
+  const cleared = getCleared().length;
+  // First 4 open, then unlock 4 more per 3 clears
+  if (cleared < 3) return 4;
+  return Math.min(stories.length, 4 + Math.floor(cleared / 3) * 4);
+}
+
 function renderStories() {
   const list = document.getElementById('story-list');
   const cleared = getCleared();
-  list.innerHTML = stories.map(s => {
+  const unlocked = getUnlockedCount();
+  
+  // Sort: difficulty ascending for unlock order
+  const sorted = [...stories].sort((a, b) => a.difficulty - b.difficulty);
+  
+  list.innerHTML = sorted.map((s, idx) => {
     const isCleared = cleared.includes(s.id);
+    const isLocked = idx >= unlocked && !isCleared;
     const stars = Array.from({length: 3}, (_, i) =>
       `<span class="star ${i < s.difficulty ? '' : 'empty'}">${i < s.difficulty ? '★' : '☆'}</span>`
     ).join('');
+    
+    if (isLocked) {
+      return `
+        <div class="story-card locked" data-id="${s.id}">
+          <div class="card-header">
+            <span class="card-emoji">🔒</span>
+            <span class="card-title">???</span>
+            <div class="card-diff">${stars}</div>
+          </div>
+          <p class="card-situation">스토리를 더 클리어하면 해금됩니다</p>
+          <div style="clear:both"></div>
+        </div>
+      `;
+    }
+    
     return `
       <div class="story-card ${isCleared ? 'cleared' : ''}" data-id="${s.id}">
         <div class="card-header">
@@ -279,6 +309,12 @@ function renderStories() {
       </div>
     `;
   }).join('');
+  
+  // Show progress
+  const progress = document.getElementById('story-progress');
+  if (progress) {
+    progress.textContent = `🔓 ${Math.min(unlocked, stories.length)}/${stories.length} 해금 · ✅ ${cleared.length} 클리어`;
+  }
 }
 
 // Start Game
