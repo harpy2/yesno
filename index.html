@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YesNo — 예, 혹은 아니오. 진실을 찾아라.</title>
+<meta name="description" content="AI가 출제하는 바다거북 수프 추리 게임. 예와 아니오, 그것만으로 미스터리를 풀어라.">
+<meta property="og:title" content="YesNo — 바다거북 수프 추리 게임">
+<meta property="og:description" content="예, 혹은 아니오. 그것만으로 진실을 찾아라.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yesno.salmonholic.com">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔮</text></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;
+  --text:#e0e0e0;--text2:#888;--text3:#555;
+  --accent:#00ff88;--accent2:#00cc6a;--accent-glow:rgba(0,255,136,.15);
+  --danger:#ff4444;--warn:#ffaa00;
+  --card:rgba(255,255,255,.03);--card-border:rgba(255,255,255,.06);
+  --glass:rgba(255,255,255,.05);
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+
+/* Hero */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden;padding:2rem}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(0,255,136,.04) 0%,transparent 70%);pointer-events:none}
+.hero h1{font-size:clamp(2.5rem,8vw,5rem);font-weight:800;letter-spacing:-0.03em;margin-bottom:1rem;background:linear-gradient(135deg,#fff 0%,#00ff88 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero p{font-size:clamp(1rem,3vw,1.4rem);color:var(--text2);max-width:500px;margin-bottom:2.5rem}
+.hero-cta{padding:16px 48px;background:var(--accent);color:#000;font-size:1.1rem;font-weight:700;border:none;border-radius:50px;cursor:pointer;transition:all .3s;letter-spacing:.02em}
+.hero-cta:hover{background:#fff;transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,255,136,.3)}
+.scroll-hint{position:absolute;bottom:2rem;animation:bounce 2s infinite;color:var(--text3);font-size:1.5rem}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(10px)}}
+
+/* Particles */
+.particles{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.particle{position:absolute;width:2px;height:2px;background:var(--accent);border-radius:50%;opacity:.3;animation:float linear infinite}
+@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.3}90%{opacity:.3}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+
+/* Stories Section */
+.stories-section{max-width:800px;margin:0 auto;padding:2rem 1.5rem 4rem}
+.stories-section h2{font-size:1.8rem;margin-bottom:.5rem}
+.stories-section .subtitle{color:var(--text2);margin-bottom:2rem}
+.story-list{display:flex;flex-direction:column;gap:1rem}
+
+/* Story Card */
+.story-card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:1.5rem;backdrop-filter:blur(10px);transition:all .3s;cursor:default;position:relative;overflow:hidden}
+.story-card:hover{border-color:rgba(0,255,136,.2);background:rgba(255,255,255,.05);transform:translateY(-2px)}
+.story-card.cleared{opacity:.4;pointer-events:none}
+.story-card.cleared::after{content:'✓ 클리어';position:absolute;top:1rem;right:1rem;background:var(--accent2);color:#000;padding:4px 12px;border-radius:20px;font-size:.8rem;font-weight:700}
+.card-header{display:flex;align-items:center;gap:12px;margin-bottom:.8rem}
+.card-emoji{font-size:2rem}
+.card-title{font-size:1.2rem;font-weight:700}
+.card-diff{display:flex;gap:2px;margin-left:auto}
+.card-diff .star{color:var(--accent);font-size:.9rem}
+.card-diff .star.empty{color:var(--text3)}
+.card-situation{color:var(--text2);font-size:.95rem;margin-bottom:1.2rem;line-height:1.7}
+.card-start{padding:10px 28px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:50px;cursor:pointer;font-size:.9rem;font-weight:600;transition:all .3s;float:right}
+.card-start:hover{background:var(--accent);color:#000}
+
+/* Game Screen */
+.game-screen{display:none;max-width:700px;margin:0 auto;min-height:100vh;padding:1rem;flex-direction:column}
+.game-screen.active{display:flex}
+.game-header{display:flex;align-items:center;padding:1rem 0;border-bottom:1px solid var(--card-border);margin-bottom:1rem;gap:12px}
+.game-back{background:none;border:none;color:var(--text2);font-size:1.3rem;cursor:pointer;padding:4px 8px}
+.game-back:hover{color:var(--text)}
+.game-title{font-size:1.1rem;font-weight:700}
+.game-turns{margin-left:auto;color:var(--text2);font-size:.85rem}
+
+.chat-area{flex:1;overflow-y:auto;padding:1rem 0;display:flex;flex-direction:column;gap:.8rem}
+.chat-msg{max-width:85%;padding:12px 16px;border-radius:16px;font-size:.95rem;line-height:1.6;animation:msgIn .3s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.chat-msg.ai{background:var(--bg3);border:1px solid var(--card-border);align-self:flex-start;border-bottom-left-radius:4px}
+.chat-msg.ai .label{color:var(--accent);font-size:.8rem;font-weight:700;margin-bottom:4px}
+.chat-msg.user{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);align-self:flex-end;border-bottom-right-radius:4px}
+.chat-msg.system{align-self:center;background:rgba(255,170,0,.1);border:1px solid rgba(255,170,0,.2);color:var(--warn);font-size:.85rem;text-align:center}
+.chat-msg.correct{align-self:center;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);text-align:center}
+.chat-msg.correct h3{color:var(--accent);margin-bottom:8px}
+
+.input-area{padding:1rem 0;border-top:1px solid var(--card-border);display:flex;gap:8px;align-items:center}
+.input-area input{flex:1;padding:12px 16px;background:var(--bg3);border:1px solid var(--card-border);border-radius:50px;color:var(--text);font-size:.95rem;outline:none;transition:border-color .3s}
+.input-area input:focus{border-color:var(--accent)}
+.input-area input::placeholder{color:var(--text3)}
+.btn-ask{padding:12px 20px;background:var(--accent);color:#000;border:none;border-radius:50px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-ask:hover{background:#fff}
+.btn-ask:disabled{opacity:.3;cursor:not-allowed}
+.btn-solve{padding:12px 20px;background:transparent;border:1px solid var(--warn);color:var(--warn);border-radius:50px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-solve:hover{background:var(--warn);color:#000}
+.btn-giveup{padding:12px 16px;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:50px;font-weight:600;cursor:pointer;font-size:.8rem;transition:all .2s;white-space:nowrap}
+.btn-giveup:hover{background:var(--danger);color:#fff}
+
+/* Solve Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.active{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--card-border);border-radius:20px;padding:2rem;max-width:500px;width:100%}
+.modal h3{margin-bottom:1rem;font-size:1.2rem}
+.modal textarea{width:100%;height:120px;background:var(--bg3);border:1px solid var(--card-border);border-radius:12px;color:var(--text);padding:12px;font-size:.95rem;resize:none;outline:none;font-family:inherit}
+.modal textarea:focus{border-color:var(--accent)}
+.modal-btns{display:flex;gap:8px;margin-top:1rem;justify-content:flex-end}
+.modal-btns button{padding:10px 24px;border-radius:50px;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+.modal-cancel{background:var(--bg3);color:var(--text)}
+.modal-submit{background:var(--warn);color:#000}
+
+/* Result Screen */
+.result-screen{display:none;max-width:600px;margin:0 auto;padding:2rem;text-align:center;min-height:100vh;flex-direction:column;align-items:center;justify-content:center}
+.result-screen.active{display:flex}
+.result-screen h2{font-size:2rem;margin-bottom:.5rem}
+.result-screen .result-emoji{font-size:4rem;margin-bottom:1rem}
+.result-stats{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:1.5rem;width:100%;margin:1.5rem 0;text-align:left}
+.result-stats .stat-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card-border)}
+.result-stats .stat-row:last-child{border:none}
+.result-stats .stat-label{color:var(--text2)}
+.result-stats .stat-value{font-weight:700}
+.result-answer{background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:16px;padding:1.5rem;width:100%;margin-bottom:1.5rem;text-align:left}
+.result-answer h4{color:var(--accent);margin-bottom:8px}
+.result-answer p{color:var(--text2);line-height:1.7}
+.result-btns{display:flex;gap:12px}
+.result-btns button{padding:14px 32px;border-radius:50px;font-weight:700;cursor:pointer;border:none;font-size:1rem;transition:all .2s}
+.btn-home{background:var(--bg3);color:var(--text)}
+.btn-home:hover{background:var(--card-border)}
+.btn-share{background:var(--accent);color:#000}
+.btn-share:hover{background:#fff}
+
+/* Loading */
+.loading{display:inline-block;width:20px;height:20px;border:2px solid var(--text3);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Responsive */
+@media(max-width:600px){
+  .hero h1{font-size:2.5rem}
+  .stories-section{padding:1.5rem 1rem 3rem}
+  .card-start{float:none;width:100%;margin-top:.5rem}
+  .input-area{flex-wrap:wrap}
+  .input-area input{min-width:0}
+  .btn-giveup{font-size:.75rem;padding:10px 12px}
+}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home">
+  <section class="hero">
+    <div class="particles" id="particles"></div>
+    <h1>YesNo</h1>
+    <p>예, 혹은 아니오.<br>그것만으로 진실에 닿을 수 있는가?</p>
+    <button class="hero-cta" onclick="scrollToStories()">미스터리 선택하기</button>
+    <div class="scroll-hint">↓</div>
+  </section>
+
+  <section class="stories-section" id="stories-section">
+    <h2>📂 미스터리 목록</h2>
+    <p class="subtitle">하나를 골라 진실을 밝혀라</p>
+    <div class="story-list" id="story-list"></div>
+  </section>
+</div>
+
+<!-- GAME -->
+<div class="game-screen" id="game-screen">
+  <div class="game-header">
+    <button class="game-back" onclick="goHome()" title="나가기">←</button>
+    <span class="game-title" id="game-title"></span>
+    <span class="game-turns" id="game-turns">질문 0회</span>
+  </div>
+  <div class="chat-area" id="chat-area"></div>
+  <div class="input-area" id="input-area">
+    <input type="text" id="question-input" placeholder="예/아니오로 답할 수 있는 질문을 하세요..." autocomplete="off">
+    <button class="btn-ask" id="btn-ask" onclick="askQuestion()">질문</button>
+    <button class="btn-solve" onclick="openSolveModal()">정답</button>
+    <button class="btn-giveup" onclick="giveUp()">포기</button>
+  </div>
+</div>
+
+<!-- SOLVE MODAL -->
+<div class="modal-overlay" id="solve-modal">
+  <div class="modal">
+    <h3>🎯 정답 시도</h3>
+    <p style="color:var(--text2);margin-bottom:1rem;font-size:.9rem">전체 스토리를 설명해주세요. 왜 그런 상황이 벌어진 건지?</p>
+    <textarea id="solve-input" placeholder="예: 남자는 사실..."></textarea>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeSolveModal()">취소</button>
+      <button class="modal-submit" onclick="submitSolve()">제출하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT -->
+<div class="result-screen" id="result-screen">
+  <div class="result-emoji" id="result-emoji"></div>
+  <h2 id="result-title"></h2>
+  <div class="result-stats" id="result-stats"></div>
+  <div class="result-answer" id="result-answer"></div>
+  <div class="result-btns">
+    <button class="btn-home" onclick="goHome()">목록으로</button>
+    <button class="btn-share" onclick="shareResult()">공유하기</button>
+  </div>
+</div>
+
+<script>
+const API_BASE = 'https://yesno-api.harpy922.workers.dev';
+let stories = [];
+let currentStory = null;
+let chatHistory = []; // {role, content} for Claude
+let turnCount = 0;
+let isLoading = false;
+let startTime = 0;
+
+// Cleared stories
+function getCleared() {
+  try { return JSON.parse(localStorage.getItem('yesno_cleared') || '[]'); } catch { return []; }
+}
+function setCleared(id) {
+  const c = getCleared();
+  if (!c.includes(id)) { c.push(id); localStorage.setItem('yesno_cleared', JSON.stringify(c)); }
+}
+
+// Particles
+function createParticles() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.animationDuration = (8 + Math.random() * 12) + 's';
+    p.style.animationDelay = Math.random() * 10 + 's';
+    p.style.width = p.style.height = (1 + Math.random() * 2) + 'px';
+    container.appendChild(p);
+  }
+}
+
+function scrollToStories() {
+  document.getElementById('stories-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Load stories
+async function loadStories() {
+  try {
+    const resp = await fetch(API_BASE + '/api/stories');
+    const data = await resp.json();
+    stories = data.stories;
+  } catch (e) {
+    // Fallback — will show error
+    console.error('Failed to load stories:', e);
+    stories = [];
+  }
+  renderStories();
+}
+
+function renderStories() {
+  const list = document.getElementById('story-list');
+  const cleared = getCleared();
+  list.innerHTML = stories.map(s => {
+    const isCleared = cleared.includes(s.id);
+    const stars = Array.from({length: 3}, (_, i) =>
+      `<span class="star ${i < s.difficulty ? '' : 'empty'}">${i < s.difficulty ? '★' : '☆'}</span>`
+    ).join('');
+    return `
+      <div class="story-card ${isCleared ? 'cleared' : ''}" data-id="${s.id}">
+        <div class="card-header">
+          <span class="card-emoji">${s.emoji}</span>
+          <span class="card-title">${s.title}</span>
+          <div class="card-diff">${stars}</div>
+        </div>
+        <p class="card-situation">${s.situation}</p>
+        ${isCleared ? '' : `<button class="card-start" onclick="startGame('${s.id}')">시작하기 ▶</button>`}
+        <div style="clear:both"></div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Start Game
+function startGame(storyId) {
+  currentStory = stories.find(s => s.id === storyId);
+  if (!currentStory) return;
+  chatHistory = [];
+  turnCount = 0;
+  startTime = Date.now();
+
+  document.getElementById('home').style.display = 'none';
+  document.getElementById('result-screen').classList.remove('active');
+  document.getElementById('game-screen').classList.add('active');
+  document.getElementById('game-title').textContent = currentStory.emoji + ' ' + currentStory.title;
+  document.getElementById('game-turns').textContent = '질문 0회';
+
+  const chat = document.getElementById('chat-area');
+  chat.innerHTML = '';
+  addChatMessage('ai', `${currentStory.situation}\n\n무슨 일이 있었던 걸까? 예/아니오로 답할 수 있는 질문을 해보세요.`);
+
+  document.getElementById('question-input').focus();
+}
+
+function addChatMessage(type, text, extraClass) {
+  const chat = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${type} ${extraClass || ''}`;
+  if (type === 'ai') {
+    div.innerHTML = `<div class="label">🤖 AI 출제자</div><div>${text.replace(/\n/g, '<br>')}</div>`;
+  } else if (type === 'correct') {
+    div.innerHTML = text;
+  } else {
+    div.innerHTML = text.replace(/\n/g, '<br>');
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+// Ask Question
+async function askQuestion() {
+  const input = document.getElementById('question-input');
+  const q = input.value.trim();
+  if (!q || isLoading) return;
+
+  input.value = '';
+  isLoading = true;
+  document.getElementById('btn-ask').disabled = true;
+
+  addChatMessage('user', q);
+  chatHistory.push({ role: 'user', content: q });
+
+  // Loading indicator
+  const loadMsg = addChatMessage('ai', '생각 중...<span class="loading"></span>');
+
+  try {
+    const resp = await fetch(API_BASE + '/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId: currentStory.id, chatHistory })
+    });
+    const data = await resp.json();
+
+    loadMsg.remove();
+    const answer = data.answer || data.error || '오류가 발생했습니다';
+    addChatMessage('ai', answer);
+    chatHistory.push({ role: 'assistant', content: answer });
+
+    turnCount++;
+    document.getElementById('game-turns').textContent = `질문 ${turnCount}회`;
+  } catch (e) {
+    loadMsg.remove();
+    addChatMessage('system', '⚠️ 서버 연결 오류. 다시 시도해주세요.');
+  }
+
+  isLoading = false;
+  document.getElementById('btn-ask').disabled = false;
+  input.focus();
+}
+
+// Solve
+function openSolveModal() {
+  document.getElementById('solve-modal').classList.add('active');
+  document.getElementById('solve-input').value = '';
+  document.getElementById('solve-input').focus();
+}
+function closeSolveModal() {
+  document.getElementById('solve-modal').classList.remove('active');
+}
+
+async function submitSolve() {
+  const attempt = document.getElementById('solve-input').value.trim();
+  if (!attempt) return;
+  closeSolveModal();
+
+  isLoading = true;
+  addChatMessage('user', `🎯 [정답 시도] ${attempt}`);
+  const loadMsg = addChatMessage('ai', '판정 중...<span class="loading"></span>');
+
+  try {
+    const resp = await fetch(API_BASE + '/api/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId: currentStory.id, attempt, chatHistory })
+    });
+    const data = await resp.json();
+    loadMsg.remove();
+
+    if (data.result === 'correct') {
+      addChatMessage('correct', `<h3>🎉 정답!</h3><p>${data.message}</p>`);
+      setCleared(currentStory.id);
+      setTimeout(() => showResult(true, data.fullAnswer || data.message), 2000);
+    } else if (data.result === 'close') {
+      addChatMessage('system', `🤏 ${data.message}`);
+    } else {
+      addChatMessage('system', `❌ ${data.message}`);
+    }
+  } catch (e) {
+    loadMsg.remove();
+    addChatMessage('system', '⚠️ 서버 연결 오류. 다시 시도해주세요.');
+  }
+  isLoading = false;
+}
+
+// Give Up
+function giveUp() {
+  if (!confirm('정말 포기하시겠습니까? 정답이 공개됩니다.')) return;
+  // We don't have the answer on frontend, so mark as cleared and show result
+  setCleared(currentStory.id);
+  showResult(false, null);
+}
+
+// Result
+function showResult(solved, answer) {
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  const min = Math.floor(elapsed / 60);
+  const sec = elapsed % 60;
+
+  document.getElementById('game-screen').classList.remove('active');
+  const rs = document.getElementById('result-screen');
+  rs.classList.add('active');
+
+  document.getElementById('result-emoji').textContent = solved ? '🎉' : '😔';
+  document.getElementById('result-title').textContent = solved ? '사건 해결!' : '미제 사건...';
+
+  document.getElementById('result-stats').innerHTML = `
+    <div class="stat-row"><span class="stat-label">스토리</span><span class="stat-value">${currentStory.emoji} ${currentStory.title}</span></div>
+    <div class="stat-row"><span class="stat-label">결과</span><span class="stat-value">${solved ? '✅ 해결' : '❌ 포기'}</span></div>
+    <div class="stat-row"><span class="stat-label">질문 수</span><span class="stat-value">${turnCount}회</span></div>
+    <div class="stat-row"><span class="stat-label">소요 시간</span><span class="stat-value">${min}분 ${sec}초</span></div>
+  `;
+
+  const ra = document.getElementById('result-answer');
+  if (answer) {
+    ra.style.display = 'block';
+    ra.innerHTML = `<h4>💡 정답</h4><p>${answer}</p>`;
+  } else {
+    // Fetch answer by making a solve request with the known answer
+    ra.style.display = 'block';
+    ra.innerHTML = `<h4>💡 정답</h4><p>다음에 다시 도전해보세요!</p>`;
+  }
+}
+
+// Share
+function shareResult() {
+  const text = `🔮 YesNo — "${currentStory.title}"\n질문 ${turnCount}회만에 해결! 🕵️\n\nhttps://yesno.salmonholic.com`;
+  if (navigator.share) {
+    navigator.share({ text });
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => alert('클립보드에 복사되었습니다!'));
+  }
+}
+
+// Navigation
+function goHome() {
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('result-screen').classList.remove('active');
+  document.getElementById('home').style.display = 'block';
+  window.scrollTo(0, 0);
+  renderStories(); // Refresh cleared state
+}
+
+// Enter key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('game-screen').classList.contains('active')) {
+    if (document.getElementById('solve-modal').classList.contains('active')) return;
+    askQuestion();
+  }
+});
+
+// Init
+createParticles();
+loadStories();
+</script>
+</body>
+</html>
