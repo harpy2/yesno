@@ -651,10 +651,14 @@ function goHome() {
   renderStats();
 }
 
-// Enter key
+// Enter key (handle Korean IME composition)
+let isComposing = false;
+document.addEventListener('compositionstart', () => { isComposing = true; });
+document.addEventListener('compositionend', () => { isComposing = false; });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('game-screen').classList.contains('active')) {
+  if (e.key === 'Enter' && !isComposing && document.getElementById('game-screen').classList.contains('active')) {
     if (document.getElementById('solve-modal').classList.contains('active')) return;
+    e.preventDefault();
     askQuestion();
   }
 });
