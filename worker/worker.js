@@ -104,26 +104,33 @@ function corsHeaders(origin, allowedOrigin) {
   };
 }
 
-async function callClaude(apiKey, systemPrompt, messages) {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 500,
-      system: systemPrompt,
-      messages: messages
-    })
-  });
-  const data = await resp.json();
-  if (data.content && data.content[0]) {
-    return data.content[0].text;
+async function callClaude(apiKey, systemPrompt, messages, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: messages
+      })
+    });
+    const data = await resp.json();
+    if (data.content && data.content[0]) {
+      return data.content[0].text;
+    }
+    // Retry on overloaded
+    if (data.error && data.error.type === 'overloaded_error' && i < retries - 1) {
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      continue;
+    }
+    throw new Error('Claude API error: ' + JSON.stringify(data));
   }
-  throw new Error('Claude API error: ' + JSON.stringify(data));
 }
 
 export default {
