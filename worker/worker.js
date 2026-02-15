@@ -114,7 +114,7 @@ async function callClaude(apiKey, systemPrompt, messages, retries = 3) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 500,
         system: systemPrompt,
         messages: messages
