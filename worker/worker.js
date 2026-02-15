@@ -245,6 +245,88 @@ export default {
       return new Response(JSON.stringify({ stories: list }), { headers });
     }
 
+    // POST /api/hint — 힌트 요청
+    if (url.pathname === '/api/hint' && request.method === 'POST') {
+      const body = await request.json();
+      const { storyId, chatHistory } = body;
+      const story = STORIES.find(s => s.id === storyId);
+      if (!story) {
+        return new Response(JSON.stringify({ error: 'Story not found' }), { status: 404, headers });
+      }
+
+      const systemPrompt = `너는 "바다거북 수프" 게임의 출제자야.
+
+## 문제 상황
+${story.situation}
+
+## 정답 (비밀)
+${story.answer}
+
+## 역할
+플레이어가 힌트를 요청했어. 정답을 직접 말하지 말고, **방향만 살짝** 알려줘.
+- 1~2문장으로 짧게
+- 정답의 핵심 키워드는 절대 포함하지 마
+- "~에 대해 생각해보세요" 또는 "~가 중요한 단서예요" 같은 식으로
+- 지금까지 대화 맥락을 보고, 플레이어가 놓치고 있는 방향을 알려줘
+- 반드시 한국어로`;
+
+      const messages = [
+        ...(chatHistory || []).map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: '힌트를 주세요' }
+      ];
+
+      try {
+        const hint = await callClaude(env.ANTHROPIC_API_KEY, systemPrompt, messages);
+        return new Response(JSON.stringify({ hint }), { headers });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers });
+      }
+    }
+
+    // GET /share/yesno — 공유 OG 페이지
+    if (url.pathname.startsWith('/share/yesno') && request.method === 'GET') {
+      const title = url.searchParams.get('t') || '미스터리';
+      const questions = url.searchParams.get('q') || '?';
+      const time = url.searchParams.get('s') || '?';
+      const grade = url.searchParams.get('g') || 'D';
+      const hints = url.searchParams.get('h') || '0';
+
+      const ogImageUrl = `${url.origin}/share/yesno/og?t=${encodeURIComponent(title)}&q=${questions}&s=${time}&g=${grade}&h=${hints}`;
+
+      const html = `<!DOCTYPE html><html><head>
+<meta charset="utf-8">
+<meta property="og:title" content="YesNo — ${title}">
+<meta property="og:description" content="질문 ${questions}회 · ${time} · 등급 ${grade}${parseInt(hints) > 0 ? ' · 힌트 ' + hints + '회' : ''}">
+<meta property="og:image" content="${ogImageUrl}">
+<meta property="og:url" content="https://yesno.salmonholic.com">
+<meta name="twitter:card" content="summary_large_image">
+<meta http-equiv="refresh" content="0;url=https://yesno.salmonholic.com">
+</head><body>Redirecting...</body></html>`;
+      return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+    }
+
+    // GET /share/yesno/og — OG 이미지 생성 (SVG→PNG 대신 SVG 직접)
+    if (url.pathname === '/share/yesno/og' && request.method === 'GET') {
+      const title = url.searchParams.get('t') || '미스터리';
+      const questions = url.searchParams.get('q') || '?';
+      const time = url.searchParams.get('s') || '?';
+      const grade = url.searchParams.get('g') || 'D';
+      const hints = url.searchParams.get('h') || '0';
+      
+      const gradeColors = { S: '#00ff88', A: '#00ccff', B: '#ffaa00', C: '#ff6644', D: '#888' };
+      const gradeColor = gradeColors[grade] || '#888';
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <text x="100" y="120" font-family="Arial,sans-serif" font-size="64" font-weight="bold" fill="#00ff88">YesNo</text>
+  <text x="100" y="200" font-family="Arial,sans-serif" font-size="36" fill="#e0e0e0">🔮 ${title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>
+  <text x="600" y="360" font-family="Arial,sans-serif" font-size="180" font-weight="bold" fill="${gradeColor}" text-anchor="middle">${grade}</text>
+  <text x="100" y="520" font-family="Arial,sans-serif" font-size="28" fill="#888">질문 ${questions}회 · ${time}${parseInt(hints) > 0 ? ' · 힌트 ' + hints + '회' : ''}</text>
+  <text x="100" y="570" font-family="Arial,sans-serif" font-size="24" fill="#555">yesno.salmonholic.com</text>
+</svg>`;
+      return new Response(svg, { headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' } });
+    }
+
     // POST /api/ask — 질문하기 (예/아니오 답변)
     if (url.pathname === '/api/ask' && request.method === 'POST') {
       const body = await request.json();

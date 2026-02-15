@@ -98,8 +98,21 @@ a{color:var(--accent);text-decoration:none}
 .btn-ask:disabled{opacity:.3;cursor:not-allowed}
 .btn-solve{padding:12px 20px;background:transparent;border:1px solid var(--warn);color:var(--warn);border-radius:50px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
 .btn-solve:hover{background:var(--warn);color:#000}
+.btn-hint{padding:12px 16px;background:transparent;border:1px solid #aa66ff;color:#aa66ff;border-radius:50px;font-weight:600;cursor:pointer;font-size:.8rem;transition:all .2s;white-space:nowrap}
+.btn-hint:hover{background:#aa66ff;color:#fff}
+.btn-hint:disabled{opacity:.3;cursor:not-allowed;border-color:var(--text3);color:var(--text3)}
 .btn-giveup{padding:12px 16px;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:50px;font-weight:600;cursor:pointer;font-size:.8rem;transition:all .2s;white-space:nowrap}
 .btn-giveup:hover{background:var(--danger);color:#fff}
+
+/* Stats Section */
+.stats-section{max-width:800px;margin:0 auto;padding:0 1.5rem 4rem}
+.stats-card{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:2rem;backdrop-filter:blur(10px)}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1.5rem;margin-bottom:1.5rem}
+.stat-box{text-align:center}
+.stat-box .stat-num{font-size:2rem;font-weight:800;color:var(--accent)}
+.stat-box .stat-desc{font-size:.85rem;color:var(--text2);margin-top:4px}
+.grade-badge{display:inline-block;font-size:3rem;font-weight:800;margin-bottom:.5rem}
+.grade-title{font-size:1.1rem;color:var(--text2)}
 
 /* Solve Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:1rem}
@@ -160,6 +173,12 @@ a{color:var(--accent);text-decoration:none}
     <div class="scroll-hint">↓</div>
   </section>
 
+  <!-- Stats -->
+  <section class="stats-section" id="stats-section">
+    <h2 style="font-size:1.8rem;margin-bottom:1rem">🕵️ 탐정 기록</h2>
+    <div class="stats-card" id="stats-card"></div>
+  </section>
+
   <section class="stories-section" id="stories-section">
     <h2>📂 미스터리 목록</h2>
     <p class="subtitle">하나를 골라 진실을 밝혀라</p>
@@ -180,6 +199,7 @@ a{color:var(--accent);text-decoration:none}
     <input type="text" id="question-input" placeholder="예/아니오로 답할 수 있는 질문을 하세요..." autocomplete="off">
     <button class="btn-ask" id="btn-ask" onclick="askQuestion()">질문</button>
     <button class="btn-solve" onclick="openSolveModal()">정답</button>
+    <button class="btn-hint" id="btn-hint" onclick="requestHint()">💡 힌트 <span id="hint-count">3</span></button>
     <button class="btn-giveup" onclick="giveUp()">포기</button>
   </div>
 </div>
@@ -217,14 +237,43 @@ let chatHistory = []; // {role, content} for Claude
 let turnCount = 0;
 let isLoading = false;
 let startTime = 0;
+let hintsUsed = 0;
+let hintsLeft = 3;
 
-// Cleared stories
+// Storage helpers
 function getCleared() {
   try { return JSON.parse(localStorage.getItem('yesno_cleared') || '[]'); } catch { return []; }
 }
 function setCleared(id) {
   const c = getCleared();
   if (!c.includes(id)) { c.push(id); localStorage.setItem('yesno_cleared', JSON.stringify(c)); }
+}
+function getStats() {
+  try { return JSON.parse(localStorage.getItem('yesno_stats') || '{}'); } catch { return {}; }
+}
+function saveStat(storyId, data) {
+  const stats = getStats();
+  stats[storyId] = data;
+  localStorage.setItem('yesno_stats', JSON.stringify(stats));
+}
+function getDetectiveGrade() {
+  const cleared = getCleared().length;
+  const stats = getStats();
+  const avgQ = Object.values(stats).length > 0 
+    ? Math.round(Object.values(stats).reduce((a, s) => a + (s.questions || 0), 0) / Object.values(stats).length) 
+    : 0;
+  if (cleared >= 15 && avgQ <= 10) return { grade: 'S', title: '🧠 셜록', color: '#00ff88' };
+  if (cleared >= 10) return { grade: 'A', title: '🎩 명탐정', color: '#00ccff' };
+  if (cleared >= 6) return { grade: 'B', title: '🕵️ 탐정', color: '#ffaa00' };
+  if (cleared >= 3) return { grade: 'C', title: '🔍 수습 탐정', color: '#ff6644' };
+  return { grade: 'D', title: '🐣 초보 탐정', color: '#888' };
+}
+function getGameGrade(questions, hints) {
+  if (hints === 0 && questions <= 5) return 'S';
+  if (hints === 0 && questions <= 10) return 'A';
+  if (questions <= 15) return 'B';
+  if (questions <= 25) return 'C';
+  return 'D';
 }
 
 // Particles
@@ -323,6 +372,8 @@ function startGame(storyId) {
   if (!currentStory) return;
   chatHistory = [];
   turnCount = 0;
+  hintsUsed = 0;
+  hintsLeft = 3;
   startTime = Date.now();
 
   document.getElementById('home').style.display = 'none';
@@ -335,6 +386,8 @@ function startGame(storyId) {
   chat.innerHTML = '';
   addChatMessage('ai', `${currentStory.situation}\n\n무슨 일이 있었던 걸까? 예/아니오로 답할 수 있는 질문을 해보세요.`);
 
+  document.getElementById('hint-count').textContent = '3';
+  document.getElementById('btn-hint').disabled = false;
   document.getElementById('question-input').focus();
 }
 
@@ -395,6 +448,39 @@ async function askQuestion() {
   input.focus();
 }
 
+// Hint
+async function requestHint() {
+  if (hintsLeft <= 0 || isLoading) return;
+  isLoading = true;
+  
+  const loadMsg = addChatMessage('ai', '힌트 생각 중...<span class="loading"></span>');
+  
+  try {
+    const resp = await fetch(API_BASE + '/api/hint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId: currentStory.id, chatHistory })
+    });
+    const data = await resp.json();
+    loadMsg.remove();
+    
+    const hint = data.hint || '힌트를 가져올 수 없습니다.';
+    addChatMessage('system', `💡 힌트: ${hint}`);
+    chatHistory.push({ role: 'assistant', content: `[힌트] ${hint}` });
+    
+    hintsUsed++;
+    hintsLeft--;
+    document.getElementById('hint-count').textContent = hintsLeft;
+    if (hintsLeft <= 0) {
+      document.getElementById('btn-hint').disabled = true;
+    }
+  } catch (e) {
+    loadMsg.remove();
+    addChatMessage('system', '⚠️ 힌트를 가져올 수 없습니다.');
+  }
+  isLoading = false;
+}
+
 // Solve
 function openSolveModal() {
   document.getElementById('solve-modal').classList.add('active');
@@ -452,10 +538,25 @@ function showResult(solved, answer) {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const min = Math.floor(elapsed / 60);
   const sec = elapsed % 60;
+  const timeStr = `${min}분 ${sec}초`;
+  const grade = solved ? getGameGrade(turnCount, hintsUsed) : '-';
+
+  // Save stats
+  if (solved) {
+    saveStat(currentStory.id, {
+      questions: turnCount,
+      hints: hintsUsed,
+      time: elapsed,
+      grade: grade,
+      date: new Date().toISOString()
+    });
+  }
 
   document.getElementById('game-screen').classList.remove('active');
   const rs = document.getElementById('result-screen');
   rs.classList.add('active');
+
+  const gradeColors = { S: '#00ff88', A: '#00ccff', B: '#ffaa00', C: '#ff6644', '-': '#888' };
 
   document.getElementById('result-emoji').textContent = solved ? '🎉' : '😔';
   document.getElementById('result-title').textContent = solved ? '사건 해결!' : '미제 사건...';
@@ -463,16 +564,20 @@ function showResult(solved, answer) {
   document.getElementById('result-stats').innerHTML = `
     <div class="stat-row"><span class="stat-label">스토리</span><span class="stat-value">${currentStory.emoji} ${currentStory.title}</span></div>
     <div class="stat-row"><span class="stat-label">결과</span><span class="stat-value">${solved ? '✅ 해결' : '❌ 포기'}</span></div>
+    <div class="stat-row"><span class="stat-label">등급</span><span class="stat-value" style="color:${gradeColors[grade] || '#888'};font-size:1.5rem">${grade}</span></div>
     <div class="stat-row"><span class="stat-label">질문 수</span><span class="stat-value">${turnCount}회</span></div>
-    <div class="stat-row"><span class="stat-label">소요 시간</span><span class="stat-value">${min}분 ${sec}초</span></div>
+    <div class="stat-row"><span class="stat-label">힌트 사용</span><span class="stat-value">${hintsUsed}회${hintsUsed === 0 ? ' 🏅' : ''}</span></div>
+    <div class="stat-row"><span class="stat-label">소요 시간</span><span class="stat-value">${timeStr}</span></div>
   `;
+
+  // Store for share
+  rs.dataset.shareData = JSON.stringify({ title: currentStory.title, questions: turnCount, time: timeStr, grade, hints: hintsUsed });
 
   const ra = document.getElementById('result-answer');
   if (answer) {
     ra.style.display = 'block';
     ra.innerHTML = `<h4>💡 정답</h4><p>${answer}</p>`;
   } else {
-    // Fetch answer by making a solve request with the known answer
     ra.style.display = 'block';
     ra.innerHTML = `<h4>💡 정답</h4><p>다음에 다시 도전해보세요!</p>`;
   }
@@ -480,12 +585,60 @@ function showResult(solved, answer) {
 
 // Share
 function shareResult() {
-  const text = `🔮 YesNo — "${currentStory.title}"\n질문 ${turnCount}회만에 해결! 🕵️\n\nhttps://yesno.salmonholic.com`;
+  const rs = document.getElementById('result-screen');
+  let d;
+  try { d = JSON.parse(rs.dataset.shareData); } catch { d = {}; }
+  
+  const shareUrl = `https://yesno-api.harpy922.workers.dev/share/yesno?t=${encodeURIComponent(d.title||'')}&q=${d.questions||0}&s=${encodeURIComponent(d.time||'')}&g=${d.grade||'D'}&h=${d.hints||0}`;
+  const text = `🔮 YesNo — "${d.title}"\n등급 ${d.grade} · 질문 ${d.questions}회 · ${d.time}${d.hints > 0 ? ' · 힌트 ' + d.hints + '회' : ''}\n\n${shareUrl}`;
+  
   if (navigator.share) {
-    navigator.share({ text });
+    navigator.share({ text, url: shareUrl });
   } else if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(() => alert('클립보드에 복사되었습니다!'));
+  } else {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('클립보드에 복사되었습니다!');
   }
+}
+
+// Stats
+function renderStats() {
+  const cleared = getCleared();
+  const stats = getStats();
+  const det = getDetectiveGrade();
+  const section = document.getElementById('stats-section');
+  
+  if (cleared.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = 'block';
+  
+  const totalQ = Object.values(stats).reduce((a, s) => a + (s.questions || 0), 0);
+  const totalTime = Object.values(stats).reduce((a, s) => a + (s.time || 0), 0);
+  const avgQ = Object.values(stats).length > 0 ? Math.round(totalQ / Object.values(stats).length) : 0;
+  const noHint = Object.values(stats).filter(s => s.hints === 0).length;
+  const totalMin = Math.floor(totalTime / 60);
+  
+  document.getElementById('stats-card').innerHTML = `
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div class="grade-badge" style="color:${det.color}">${det.grade}</div>
+      <div class="grade-title">${det.title}</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-num">${cleared.length}</div><div class="stat-desc">클리어</div></div>
+      <div class="stat-box"><div class="stat-num">${avgQ}</div><div class="stat-desc">평균 질문</div></div>
+      <div class="stat-box"><div class="stat-num">${noHint}</div><div class="stat-desc">노힌트 🏅</div></div>
+      <div class="stat-box"><div class="stat-num">${totalMin}분</div><div class="stat-desc">총 플레이</div></div>
+    </div>
+  `;
 }
 
 // Navigation
@@ -494,7 +647,8 @@ function goHome() {
   document.getElementById('result-screen').classList.remove('active');
   document.getElementById('home').style.display = 'block';
   window.scrollTo(0, 0);
-  renderStories(); // Refresh cleared state
+  renderStories();
+  renderStats();
 }
 
 // Enter key
@@ -508,6 +662,7 @@ document.addEventListener('keydown', e => {
 // Init
 createParticles();
 loadStories();
+renderStats();
 </script>
 </body>
 </html>
