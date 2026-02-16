@@ -29,8 +29,8 @@ gtag('config', 'G-HWMPYGPHV6');
   --card:rgba(255,255,255,.03);--card-border:rgba(255,255,255,.06);
   --glass:rgba(255,255,255,.05);
 }
-html{scroll-behavior:smooth;overflow-x:hidden}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6;overflow-x:hidden;max-width:100vw}
+html,body{scroll-behavior:smooth;overflow-x:hidden;max-width:100%;width:100%}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.6}
 a{color:var(--accent);text-decoration:none}
 
 /* Hero */
@@ -44,7 +44,7 @@ a{color:var(--accent);text-decoration:none}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(10px)}}
 
 /* Particles */
-.particles{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
 .particle{position:absolute;width:4px;height:4px;background:var(--accent);border-radius:50%;opacity:.5;box-shadow:0 0 6px var(--accent);animation:float linear infinite}
 @keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:.5}90%{opacity:.5}100%{transform:translateY(-10vh) scale(1);opacity:0}}
 
